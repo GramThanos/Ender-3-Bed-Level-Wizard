@@ -1,0 +1,1342 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover"/>
+<title>Bed Leveling Wizard — Ender 3</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:        #15171c;
+    --panel:     #1c1f26;
+    --panel-2:   #21252d;
+    --line:      #2e333d;
+    --line-soft: #262a32;
+    --text:      #e9e7e1;
+    --text-dim:  #9a9fab;
+    --text-faint:#5e636f;
+    --signal:    #ff6a35;
+    --signal-dim:#7a3a22;
+    --ok:        #4ade80;
+    --ok-dim:    #1f3a2a;
+    --err:       #ff5d5d;
+    --warn:      #f0b429;
+    --mono: 'IBM Plex Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    --radius: 10px;
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{ height:100%; }
+  body{
+    margin:0;
+    background:
+      radial-gradient(900px 500px at 12% -10%, rgba(255,106,53,0.07), transparent 60%),
+      var(--bg);
+    color:var(--text);
+    font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{ background:var(--signal); color:#1a0c05; }
+
+  a{ color:inherit; }
+
+  .shell{
+    max-width:1180px;
+    margin:0 auto;
+    padding:28px 20px 120px;
+  }
+
+  /* ---------------- Header ---------------- */
+  .topbar{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:20px;
+    padding-bottom:22px;
+    border-bottom:1px solid var(--line);
+    margin-bottom:28px;
+  }
+  .brand{ display:flex; align-items:center; gap:14px; }
+  .brand-mark{
+    width:42px; height:42px;
+    border:1px solid var(--line);
+    border-radius:8px;
+    display:flex; align-items:center; justify-content:center;
+    background:var(--panel);
+    flex:none;
+  }
+  .brand-mark svg{ width:22px; height:22px; }
+  .brand h1{
+    font-family:var(--mono);
+    font-size:17px;
+    font-weight:600;
+    letter-spacing:0.01em;
+    margin:0;
+  }
+  .brand .sub{
+    font-size:12.5px;
+    color:var(--text-dim);
+    margin-top:3px;
+    font-family:var(--mono);
+  }
+
+  .conn-cluster{ display:flex; align-items:center; gap:10px; }
+
+  .status-pill{
+    display:inline-flex;
+    align-items:center;
+    gap:7px;
+    font-family:var(--mono);
+    font-size:11.5px;
+    font-weight:600;
+    letter-spacing:0.06em;
+    text-transform:uppercase;
+    padding:7px 12px 7px 10px;
+    border-radius:999px;
+    border:1px solid var(--line);
+    background:var(--panel);
+    color:var(--text-dim);
+  }
+  .status-pill .dot{
+    width:7px; height:7px; border-radius:50%;
+    background:var(--text-faint);
+    box-shadow:0 0 0 0 rgba(255,93,93,0);
+  }
+  .status-pill.live{ color:var(--ok); border-color:rgba(74,222,128,0.35); background:rgba(74,222,128,0.06); }
+  .status-pill.live .dot{
+    background:var(--ok);
+    animation:pulse-ok 1.8s ease-in-out infinite;
+  }
+  .status-pill.down{ color:var(--err); border-color:rgba(255,93,93,0.3); background:rgba(255,93,93,0.06); }
+  .status-pill.down .dot{ background:var(--err); }
+  @keyframes pulse-ok{
+    0%,100%{ box-shadow:0 0 0 0 rgba(74,222,128,0.5); }
+    50%{ box-shadow:0 0 0 4px rgba(74,222,128,0); }
+  }
+
+  .btn{
+    font-family:var(--mono);
+    font-size:13px;
+    font-weight:600;
+    letter-spacing:0.01em;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--panel);
+    color:var(--text);
+    padding:9px 16px;
+    cursor:pointer;
+    transition:border-color .15s ease, background .15s ease, color .15s ease, transform .05s ease;
+    -webkit-tap-highlight-color:transparent;
+  }
+  .btn:hover:not(:disabled){ border-color:#454b58; background:#262a33; }
+  .btn:active:not(:disabled){ transform:translateY(1px); }
+  .btn:disabled{ opacity:0.4; cursor:not-allowed; }
+  .btn:focus-visible{ outline:2px solid var(--signal); outline-offset:2px; }
+
+  .btn-signal{
+    background:var(--signal);
+    border-color:var(--signal);
+    color:#1a0c05;
+  }
+  .btn-signal:hover:not(:disabled){ background:#ff7c4d; border-color:#ff7c4d; }
+
+  .btn-ghost{ background:transparent; }
+
+  .btn-lg{
+    font-size:14.5px;
+    padding:14px 30px;
+    border-radius:10px;
+  }
+
+  /* ---------------- Layout grid ---------------- */
+  .grid{
+    display:grid;
+    grid-template-columns: 1.55fr 1fr;
+    gap:20px;
+    align-items:start;
+  }
+  @media (max-width: 940px){
+    .grid{ grid-template-columns: 1fr; }
+  }
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    overflow:hidden;
+  }
+  .panel-head{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    padding:14px 18px;
+    border-bottom:1px solid var(--line);
+    background:var(--panel-2);
+  }
+  .panel-head h2{
+    font-family:var(--mono);
+    font-size:11.5px;
+    font-weight:600;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    color:var(--text-dim);
+    margin:0;
+  }
+  .panel-body{ padding:22px 22px 24px; }
+
+  /* ---------------- Progress ---------------- */
+  .progress-track{
+    height:5px;
+    background:var(--line-soft);
+    border-radius:999px;
+    overflow:hidden;
+    margin-bottom:8px;
+  }
+  .progress-fill{
+    height:100%;
+    width:0%;
+    background:linear-gradient(90deg, var(--signal-dim), var(--signal));
+    border-radius:999px;
+    transition:width .35s cubic-bezier(.4,0,.2,1);
+  }
+  .progress-label{
+    display:flex; justify-content:space-between;
+    font-family:var(--mono); font-size:11px; color:var(--text-faint);
+    letter-spacing:0.04em; text-transform:uppercase;
+    margin-bottom:26px;
+  }
+
+  /* ---------------- Bed map (signature element) ---------------- */
+  .bedmap-wrap{ display:flex; justify-content:center; margin-bottom:6px; }
+  .bedmap-wrap svg{ width:100%; max-width:300px; height:auto; }
+  .corner-label{
+    font-family:var(--mono);
+    font-size:9.5px;
+    fill:var(--text-faint);
+    letter-spacing:0.04em;
+  }
+  .corner-label.active{ fill:var(--signal); font-weight:600; }
+  .corner-dot{ transition:fill .25s ease, r .25s ease; }
+  .nozzle{ transition: cx .5s cubic-bezier(.4,0,.2,1), cy .5s cubic-bezier(.4,0,.2,1), opacity .3s ease; }
+
+  /* ---------------- Printer info card (hardware + live temps) ---------------- */
+  .printer-info{
+    margin-bottom:20px;
+  }
+  .printer-info-body{
+    display:grid;
+    grid-template-columns: 1fr 1px auto;
+    gap:20px;
+    align-items:center;
+    padding:16px 20px;
+  }
+  @media (max-width:760px){
+    .printer-info-body{ grid-template-columns:1fr; }
+    .printer-info-divider{ display:none; }
+  }
+  .printer-info-divider{ width:1px; align-self:stretch; background:var(--line); }
+
+  .hw-grid{
+    display:grid;
+    grid-template-columns:repeat(auto-fit, minmax(120px, 1fr));
+    gap:14px 22px;
+  }
+  .hw-field{ min-width:0; }
+  .hw-field-label{
+    font-family:var(--mono);
+    font-size:9.5px;
+    font-weight:600;
+    letter-spacing:0.09em;
+    text-transform:uppercase;
+    color:var(--text-faint);
+    margin-bottom:3px;
+  }
+  .hw-field-value{
+    font-family:var(--mono);
+    font-size:13px;
+    font-weight:600;
+    color:var(--text);
+    white-space:nowrap;
+    overflow:hidden;
+    text-overflow:ellipsis;
+  }
+  .hw-field-value.dim{ color:var(--text-faint); font-weight:500; }
+  .hw-field-value.uuid{ font-size:10.5px; font-weight:500; color:var(--text-dim); }
+
+  .temp-strip{
+    display:grid;
+    grid-template-columns:1fr 1fr;
+    gap:10px;
+    min-width:260px;
+  }
+  .temp-card{
+    border:1px solid var(--line);
+    border-radius:8px;
+    background:var(--panel-2);
+    padding:10px 14px;
+    position:relative;
+    overflow:hidden;
+  }
+  .temp-card .temp-fill{
+    position:absolute;
+    inset:auto 0 0 0;
+    height:3px;
+    background:var(--text-faint);
+    width:0%;
+    transition:width .4s ease, background .4s ease;
+  }
+  .temp-card.heating .temp-fill{ background:var(--signal); }
+  .temp-card.at-target .temp-fill{ background:var(--ok); }
+  .temp-card-top{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+  }
+  .temp-card-label{
+    font-family:var(--mono);
+    font-size:10px;
+    font-weight:600;
+    letter-spacing:0.09em;
+    text-transform:uppercase;
+    color:var(--text-faint);
+  }
+  .temp-card-icon{ font-size:13px; line-height:1; }
+  .temp-card-readout{
+    font-family:var(--mono);
+    font-size:19px;
+    font-weight:700;
+    color:var(--text);
+    margin-top:4px;
+  }
+  .temp-card-readout .target{
+    font-size:12.5px;
+    font-weight:500;
+    color:var(--text-faint);
+  }
+  .temp-card.heating .temp-card-readout{ color:var(--signal); }
+  .temp-card.at-target .temp-card-readout{ color:var(--ok); }
+  .temp-card.stale .temp-card-readout{ color:var(--text-faint); }
+  .temp-stale-tag{
+    font-family:var(--mono);
+    font-size:9px;
+    color:var(--text-faint);
+    letter-spacing:0.05em;
+    text-transform:uppercase;
+    margin-top:2px;
+    visibility:hidden;
+  }
+  .temp-card.stale .temp-stale-tag{ visibility:visible; }
+
+  /* ---------------- Step content ---------------- */
+  .step-eyebrow{
+    font-family:var(--mono);
+    font-size:11.5px;
+    font-weight:600;
+    letter-spacing:0.1em;
+    text-transform:uppercase;
+    color:var(--signal);
+    margin-bottom:10px;
+    min-height:15px;
+  }
+  .step-title{
+    font-family:var(--sans);
+    font-size:25px;
+    font-weight:700;
+    letter-spacing:-0.01em;
+    margin:0 0 10px;
+    text-align:center;
+  }
+  .step-desc{
+    font-size:14.5px;
+    line-height:1.6;
+    color:var(--text-dim);
+    text-align:center;
+    max-width:480px;
+    margin:0 auto 22px;
+  }
+
+  /* ---------------- Jog controls ---------------- */
+  .jog-panel{
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    background:var(--panel-2);
+    padding:18px;
+    margin:0 auto 22px;
+    max-width:460px;
+  }
+  .jog-hint{
+    font-size:12.5px;
+    color:var(--text-dim);
+    text-align:center;
+    margin-bottom:16px;
+    line-height:1.5;
+  }
+  .jog-row{
+    display:grid;
+    grid-template-columns:repeat(5,1fr);
+    gap:8px;
+    margin-bottom:16px;
+  }
+  .btn-jog{
+    font-family:var(--mono);
+    font-size:13px;
+    font-weight:600;
+    padding:13px 4px;
+    border-radius:8px;
+    border:1px solid var(--line);
+    background:var(--panel);
+    color:var(--text);
+    cursor:pointer;
+    transition:border-color .15s ease, background .15s ease, transform .05s ease;
+  }
+  .btn-jog:hover:not(:disabled){ border-color:var(--signal); color:var(--signal); }
+  .btn-jog:active:not(:disabled){ transform:translateY(1px) scale(0.97); }
+  .btn-jog:disabled{ opacity:0.35; cursor:not-allowed; }
+  .btn-jog[data-dz^="-"]{ }
+  .btn-jog.zero-side{ border-color:#3a3f4a; }
+
+  .z-readout{
+    display:flex;
+    align-items:baseline;
+    justify-content:center;
+    gap:8px;
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--text-dim);
+    letter-spacing:0.03em;
+  }
+  .z-readout .val{
+    font-size:20px;
+    font-weight:700;
+    color:var(--text);
+    min-width:64px;
+    text-align:right;
+  }
+  .z-readout .unit{ color:var(--text-faint); }
+
+  /* ---------------- G-code preview ---------------- */
+  .gcode-panel{
+    display:none;
+    max-width:460px;
+    margin:0 auto 22px;
+    border:1px solid var(--line);
+    border-radius:8px;
+    overflow:hidden;
+    background:#101216;
+  }
+  .gcode-panel-head{
+    display:flex; align-items:center; gap:8px;
+    padding:8px 12px;
+    background:#181b21;
+    border-bottom:1px solid var(--line);
+    font-family:var(--mono);
+    font-size:10.5px;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    color:var(--text-faint);
+  }
+  .gcode-panel-head .dot3{ display:flex; gap:5px; }
+  .gcode-panel-head .dot3 span{ width:7px; height:7px; border-radius:50%; background:#3a3f4a; }
+  #gcode-text{
+    display:block;
+    padding:12px 14px;
+    font-family:var(--mono);
+    font-size:12.5px;
+    line-height:1.7;
+    color:var(--ok);
+    white-space:pre-wrap;
+    text-align:left;
+  }
+
+  .cta-row{ text-align:center; }
+
+  /* ---------------- Console ---------------- */
+  .console-box{
+    background:#0c0d10;
+    font-family:var(--mono);
+    font-size:12px;
+    line-height:1.65;
+    max-height:280px;
+    overflow-y:auto;
+    padding:14px 16px;
+    color:#7fd994;
+  }
+  .console-box div{ white-space:pre-wrap; word-break:break-word; }
+  .console-box .line-err{ color:var(--err); }
+  .console-box .line-sent{ color:#7fb3ff; }
+  .console-box::-webkit-scrollbar{ width:8px; }
+  .console-box::-webkit-scrollbar-thumb{ background:#262a32; border-radius:4px; }
+  .console-box::-webkit-scrollbar-track{ background:transparent; }
+
+  .safety-note{
+    padding:16px 18px;
+    font-size:12.5px;
+    line-height:1.6;
+    color:var(--text-dim);
+  }
+  .safety-note strong{ color:var(--warn); font-family:var(--mono); letter-spacing:0.02em; }
+
+  /* ---------------- E-stop ---------------- */
+  .estop-btn{
+    position:fixed;
+    bottom:24px;
+    right:24px;
+    z-index:1000;
+    width:84px;
+    height:84px;
+    border-radius:50%;
+    border:3px solid #2a0805;
+    background:radial-gradient(circle at 35% 30%, #ff5d4a, #c2241a 70%);
+    color:#fff8f6;
+    font-family:var(--mono);
+    font-weight:700;
+    font-size:11px;
+    letter-spacing:0.04em;
+    line-height:1.25;
+    cursor:pointer;
+    box-shadow:0 6px 22px rgba(194,36,26,0.45), 0 0 0 0 rgba(255,93,74,0.5);
+    display:none;
+    animation:estop-breathe 2.4s ease-in-out infinite;
+  }
+  .estop-btn:hover{ filter:brightness(1.08); }
+  .estop-btn:active{ transform:translateY(1px) scale(0.98); }
+  @keyframes estop-breathe{
+    0%,100%{ box-shadow:0 6px 22px rgba(194,36,26,0.45), 0 0 0 0 rgba(255,93,74,0.35); }
+    50%{ box-shadow:0 6px 22px rgba(194,36,26,0.45), 0 0 0 9px rgba(255,93,74,0); }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    *{ animation-duration:0.001ms !important; animation-iteration-count:1 !important; transition-duration:0.001ms !important; }
+  }
+
+  @media (max-width:480px){
+    .step-title{ font-size:21px; }
+    .jog-row{ gap:6px; }
+    .btn-jog{ padding:11px 2px; font-size:11.5px; }
+    .estop-btn{ width:72px; height:72px; font-size:9.5px; bottom:16px; right:16px; }
+  }
+</style>
+</head>
+<body>
+
+  <div class="shell">
+
+    <div class="topbar">
+      <div class="brand">
+        <div class="brand-mark">
+          <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M12 2L13.5 8.5L20 7L15.5 12L20 17L13.5 15.5L12 22L10.5 15.5L4 17L8.5 12L4 7L10.5 8.5L12 2Z" stroke="#ff6a35" stroke-width="1.3" stroke-linejoin="round"/>
+          </svg>
+        </div>
+        <div>
+          <h1>BED&nbsp;LEVEL&nbsp;//&nbsp;ENDER&nbsp;3</h1>
+          <div class="sub">manual calibration over usb serial</div>
+        </div>
+      </div>
+      <div class="conn-cluster">
+        <span id="connection-status" class="status-pill down"><span class="dot"></span>Disconnected</span>
+        <button id="btn-connect" class="btn btn-signal">Connect Printer</button>
+      </div>
+    </div>
+
+    <div class="panel printer-info" id="printer-info">
+      <div class="panel-head">
+        <h2>Printer Info</h2>
+      </div>
+      <div class="printer-info-body">
+        <div class="hw-grid">
+          <div class="hw-field">
+            <div class="hw-field-label">Firmware</div>
+            <div class="hw-field-value dim" id="hw-firmware">—</div>
+          </div>
+          <div class="hw-field">
+            <div class="hw-field-label">Machine Type</div>
+            <div class="hw-field-value dim" id="hw-machine">—</div>
+          </div>
+          <div class="hw-field">
+            <div class="hw-field-label">Kinematics</div>
+            <div class="hw-field-value dim" id="hw-kinematics">—</div>
+          </div>
+          <div class="hw-field">
+            <div class="hw-field-label">Extruders</div>
+            <div class="hw-field-value dim" id="hw-extruders">—</div>
+          </div>
+          <div class="hw-field">
+            <div class="hw-field-label">Protocol</div>
+            <div class="hw-field-value dim" id="hw-protocol">—</div>
+          </div>
+          <div class="hw-field">
+            <div class="hw-field-label">Board UUID</div>
+            <div class="hw-field-value uuid dim" id="hw-uuid">—</div>
+          </div>
+        </div>
+        <div class="printer-info-divider"></div>
+        <div id="temp-strip" class="temp-strip">
+          <div id="temp-card-hotend" class="temp-card stale">
+            <div class="temp-card-top">
+              <span class="temp-card-label">Hotend</span>
+              <span class="temp-card-icon">🔥</span>
+            </div>
+            <div class="temp-card-readout"><span id="temp-hotend-cur">--</span>°<span class="target">/ <span id="temp-hotend-tgt">--</span>°</span></div>
+            <div class="temp-stale-tag">no data yet</div>
+            <div class="temp-fill" id="temp-hotend-fill"></div>
+          </div>
+          <div id="temp-card-bed" class="temp-card stale">
+            <div class="temp-card-top">
+              <span class="temp-card-label">Bed</span>
+              <span class="temp-card-icon">▦</span>
+            </div>
+            <div class="temp-card-readout"><span id="temp-bed-cur">--</span>°<span class="target">/ <span id="temp-bed-tgt">--</span>°</span></div>
+            <div class="temp-stale-tag">no data yet</div>
+            <div class="temp-fill" id="temp-bed-fill"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid">
+
+      <!-- ============ Main wizard panel ============ -->
+      <div class="panel">
+        <div class="panel-head">
+          <h2>Calibration Wizard</h2>
+        </div>
+        <div class="panel-body">
+
+          <div class="progress-track"><div id="progress-bar" class="progress-fill"></div></div>
+          <div class="progress-label">
+            <span id="progress-text">Step 0 / 10</span>
+            <span id="progress-pct">0%</span>
+          </div>
+
+          <div class="bedmap-wrap" id="bedmap-wrap" style="display:none;">
+            <svg viewBox="0 0 220 220" id="bedmap-svg">
+              <rect x="14" y="14" width="192" height="192" rx="6" fill="none" stroke="#3a3f4a" stroke-width="1.5"/>
+              <rect x="14" y="14" width="192" height="192" rx="6" fill="url(#bedgrid)" opacity="0.5"/>
+              <defs>
+                <pattern id="bedgrid" width="19.2" height="19.2" patternUnits="userSpaceOnUse">
+                  <path d="M 19.2 0 L 0 0 0 19.2" fill="none" stroke="#23262d" stroke-width="1"/>
+                </pattern>
+              </defs>
+              <!-- corners: FL, FR, RR, RL -->
+              <circle id="dot-fl" class="corner-dot" cx="30" cy="190" r="5" fill="#5e636f"/>
+              <circle id="dot-fr" class="corner-dot" cx="190" cy="190" r="5" fill="#5e636f"/>
+              <circle id="dot-rr" class="corner-dot" cx="190" cy="30" r="5" fill="#5e636f"/>
+              <circle id="dot-rl" class="corner-dot" cx="30" cy="30" r="5" fill="#5e636f"/>
+              <text id="lbl-fl" class="corner-label" x="30" y="206" text-anchor="middle">FRONT-L</text>
+              <text id="lbl-fr" class="corner-label" x="190" y="206" text-anchor="middle">FRONT-R</text>
+              <text id="lbl-rr" class="corner-label" x="190" y="22" text-anchor="middle">REAR-R</text>
+              <text id="lbl-rl" class="corner-label" x="30" y="22" text-anchor="middle">REAR-L</text>
+              <circle id="nozzle" class="nozzle" cx="110" cy="110" r="7" fill="#ff6a35" opacity="0">
+                <animate attributeName="opacity" values="1;0.5;1" dur="1.6s" repeatCount="indefinite"/>
+              </circle>
+            </svg>
+          </div>
+
+          <div id="step-eyebrow" class="step-eyebrow"></div>
+          <h1 id="step-title" class="step-title">Ready to Level</h1>
+          <p id="step-desc" class="step-desc">
+            Connect to your printer first using the button in the top right. Make sure your nozzle and bed are clean.
+          </p>
+
+          <div id="z-jog-controls" class="jog-panel" style="display:none;">
+            <div class="jog-hint">Lower the nozzle gradually. Stop the moment a sheet of paper just starts to drag underneath.</div>
+            <div class="jog-row">
+              <button class="btn-jog" data-dz="-1">−1.0</button>
+              <button class="btn-jog" data-dz="-0.1">−0.1</button>
+              <button class="btn-jog zero-side" data-dz="-0.05">−0.05</button>
+              <button class="btn-jog" data-dz="0.1">+0.1</button>
+              <button class="btn-jog" data-dz="1">+1.0</button>
+            </div>
+            <div class="z-readout">
+              <span>Z OFFSET</span>
+              <span class="val"><span id="z-current">0.00</span></span>
+              <span class="unit">mm</span>
+            </div>
+          </div>
+
+          <div id="gcode-preview" class="gcode-panel">
+            <div class="gcode-panel-head">
+              <div class="dot3"><span></span><span></span><span></span></div>
+              <span>g-code sent</span>
+            </div>
+            <code id="gcode-text"></code>
+          </div>
+
+          <div class="cta-row">
+            <button id="btn-next" class="btn btn-signal btn-lg" disabled>Start Homing (Step 1)</button>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- ============ Side column ============ -->
+      <div>
+        <div class="panel">
+          <div class="panel-head">
+            <h2>Printer Console</h2>
+          </div>
+          <div id="console" class="console-box">Not connected.</div>
+        </div>
+
+        <div class="panel" style="margin-top:16px;">
+          <div class="safety-note">
+            <strong>⚠ SAFETY —</strong> This tool sends real G-code over USB. Keep the printer in view at all times and use the
+            stop button if anything looks wrong. Z movements toward the bed are intentionally small and manual — there is no
+            automatic Z0 plunge.
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <button id="btn-estop" class="estop-btn" style="display:none;">EMERGENCY<br/>STOP</button>
+
+  <script>
+    // ---------------------------------------------------------------------
+    // State
+    // ---------------------------------------------------------------------
+    let port = null;
+    let writer = null;
+    let reader = null;
+    let readableStreamClosed = null;
+    let writableStreamClosed = null;
+    let currentStep = -1;
+    let zOffset = 0; // running offset applied during the jog phase of each corner, relative to its approach height
+
+    // Each corner step now has an "approach" gcode (lift + travel to a safe hover height)
+    // and a jog phase where the user manually lowers Z in small increments while watching feedback.
+    // No step ever commands Z0 directly — the user controls the final descent.
+    const HOVER_Z = 5;     // mm above bed during travel
+    const APPROACH_Z = 0.6; // mm above bed when we stop automatic descent and hand control to the user
+
+    // corner key used to drive the bed-map highlight: fl / fr / rr / rl
+    const wizardSteps = [
+      {
+        title: "Home and Set Up",
+        desc: "Homing all axes (moves nozzle to front-left corner). Ensure Absolute Positioning is on.",
+        gcode: "G28\nG90",
+        kind: "auto"
+      },
+      { title: "Front-Left Corner", desc: "Adjust the front-left knob using the jog buttons below until a sheet of paper just drags under the nozzle.", x: 30, y: 30, kind: "corner", corner: "fl", pass: 1 },
+      { title: "Front-Right Corner", desc: "Adjust the front-right knob using the jog buttons below until a sheet of paper just drags under the nozzle.", x: 200, y: 30, kind: "corner", corner: "fr", pass: 1 },
+      { title: "Rear-Right Corner", desc: "Adjust the rear-right knob using the jog buttons below until a sheet of paper just drags under the nozzle.", x: 200, y: 200, kind: "corner", corner: "rr", pass: 1 },
+      { title: "Rear-Left Corner", desc: "Adjust the rear-left knob using the jog buttons below until a sheet of paper just drags under the nozzle.", x: 30, y: 200, kind: "corner", corner: "rl", pass: 1 },
+      { title: "Front-Left Corner (Re-check)", desc: "Cross-check: fine-tune the front-left knob if needed.", x: 30, y: 30, kind: "corner", corner: "fl", pass: 2 },
+      { title: "Front-Right Corner (Re-check)", desc: "Cross-check: fine-tune the front-right knob if needed.", x: 200, y: 30, kind: "corner", corner: "fr", pass: 2 },
+      { title: "Rear-Right Corner (Re-check)", desc: "Cross-check: fine-tune the rear-right knob if needed.", x: 200, y: 200, kind: "corner", corner: "rr", pass: 2 },
+      { title: "Rear-Left Corner (Re-check)", desc: "Cross-check: fine-tune the rear-left knob if needed.", x: 30, y: 200, kind: "corner", corner: "rl", pass: 2 },
+      {
+        title: "Leveling Complete",
+        desc: "Bed leveling is done. Lifting nozzle and moving to center for safety.",
+        gcode: `G1 Z${HOVER_Z + 10} F3000\nG1 X115 Y115`,
+        kind: "auto"
+      }
+    ];
+
+    // ---------------------------------------------------------------------
+    // DOM
+    // ---------------------------------------------------------------------
+    const btnConnect = document.getElementById('btn-connect');
+    const statusBadge = document.getElementById('connection-status');
+    const btnNext = document.getElementById('btn-next');
+    const btnEstop = document.getElementById('btn-estop');
+    const stepEyebrow = document.getElementById('step-eyebrow');
+    const stepTitle = document.getElementById('step-title');
+    const stepDesc = document.getElementById('step-desc');
+    const progressBar = document.getElementById('progress-bar');
+    const progressText = document.getElementById('progress-text');
+    const progressPct = document.getElementById('progress-pct');
+    const gcodePreview = document.getElementById('gcode-preview');
+    const gcodeText = document.getElementById('gcode-text');
+    const consoleBox = document.getElementById('console');
+    const zJogControls = document.getElementById('z-jog-controls');
+    const zCurrentLabel = document.getElementById('z-current');
+    const bedmapWrap = document.getElementById('bedmap-wrap');
+    const nozzleEl = document.getElementById('nozzle');
+    const cornerDots = { fl: document.getElementById('dot-fl'), fr: document.getElementById('dot-fr'), rr: document.getElementById('dot-rr'), rl: document.getElementById('dot-rl') };
+    const cornerLabels = { fl: document.getElementById('lbl-fl'), fr: document.getElementById('lbl-fr'), rr: document.getElementById('lbl-rr'), rl: document.getElementById('lbl-rl') };
+    const cornerPos = { fl: {x:30,y:190}, fr: {x:190,y:190}, rr: {x:190,y:30}, rl: {x:30,y:30} };
+    const tempStrip = document.getElementById('temp-strip');
+    const tempCardHotend = document.getElementById('temp-card-hotend');
+    const tempCardBed = document.getElementById('temp-card-bed');
+    const tempHotendCur = document.getElementById('temp-hotend-cur');
+    const tempHotendTgt = document.getElementById('temp-hotend-tgt');
+    const tempBedCur = document.getElementById('temp-bed-cur');
+    const tempBedTgt = document.getElementById('temp-bed-tgt');
+    const tempHotendFill = document.getElementById('temp-hotend-fill');
+    const tempBedFill = document.getElementById('temp-bed-fill');
+    const hwFirmware = document.getElementById('hw-firmware');
+    const hwMachine = document.getElementById('hw-machine');
+    const hwKinematics = document.getElementById('hw-kinematics');
+    const hwExtruders = document.getElementById('hw-extruders');
+    const hwProtocol = document.getElementById('hw-protocol');
+    const hwUuid = document.getElementById('hw-uuid');
+
+    function logLine(text, cls) {
+      const div = document.createElement('div');
+      if (cls) div.className = cls;
+      div.textContent = text;
+      consoleBox.appendChild(div);
+      consoleBox.scrollTop = consoleBox.scrollHeight;
+      // keep console from growing unbounded
+      while (consoleBox.childNodes.length > 300) {
+        consoleBox.removeChild(consoleBox.firstChild);
+      }
+    }
+
+    // ---------------------------------------------------------------------
+    // Serial: connect / disconnect
+    // ---------------------------------------------------------------------
+    btnConnect.addEventListener('click', async () => {
+      if (!('serial' in navigator)) {
+        alert("Web Serial API not supported in this browser. Please use Chrome or Edge.");
+        return;
+      }
+      if (!port) {
+        await connectSerial();
+      } else {
+        await disconnectSerial();
+      }
+    });
+
+    async function connectSerial() {
+      try {
+        port = await navigator.serial.requestPort();
+        await port.open({ baudRate: 115200 });
+
+        port.addEventListener('disconnect', handleUnexpectedDisconnect);
+
+        // Writer
+        const textEncoder = new TextEncoderStream();
+        writableStreamClosed = textEncoder.readable.pipeTo(port.writable);
+        writer = textEncoder.writable.getWriter();
+
+        // Reader (line-buffered)
+        startReadLoop();
+
+        statusBadge.innerHTML = '<span class="dot"></span>Connected';
+        statusBadge.classList.remove("down");
+        statusBadge.classList.add("live");
+        btnConnect.textContent = "Disconnect";
+        btnConnect.classList.remove("btn-signal");
+        btnConnect.classList.add("btn-ghost");
+        btnNext.disabled = false;
+        btnEstop.style.display = 'block';
+        bedmapWrap.style.display = 'flex';
+
+        consoleBox.textContent = '';
+        logLine("Connected at 115200 baud.");
+        startTempPolling();
+        queryFirmwareInfo();
+        updateUI();
+      } catch (error) {
+        console.error("Serial Connection Error:", error);
+        alert("Failed to connect: " + error.message);
+        port = null;
+      }
+    }
+
+    async function disconnectSerial({ silent = false, unexpected = false } = {}) {
+      try {
+        if (reader) {
+          await reader.cancel().catch(() => {});
+          reader = null;
+        }
+        if (readableStreamClosed) {
+          await readableStreamClosed.catch(() => {});
+          readableStreamClosed = null;
+        }
+        if (writer) {
+          await writer.close().catch(() => {});
+          writer = null;
+        }
+        if (writableStreamClosed) {
+          await writableStreamClosed.catch(() => {});
+          writableStreamClosed = null;
+        }
+        if (port) {
+          port.removeEventListener('disconnect', handleUnexpectedDisconnect);
+          await port.close().catch(() => {});
+        }
+      } catch (err) {
+        console.error("Error during disconnect:", err);
+      } finally {
+        port = null;
+        stopTempPolling();
+        tempCardHotend.classList.add('stale');
+        tempCardBed.classList.add('stale');
+        resetHardwareInfo();
+        statusBadge.innerHTML = '<span class="dot"></span>Disconnected';
+        statusBadge.classList.remove("live");
+        statusBadge.classList.add("down");
+        btnConnect.textContent = "Connect Printer";
+        btnConnect.classList.remove("btn-ghost");
+        btnConnect.classList.add("btn-signal");
+        btnNext.disabled = true;
+        btnEstop.style.display = 'none';
+        bedmapWrap.style.display = 'none';
+        zJogControls.style.display = 'none';
+        if (!silent) logLine("Disconnected.");
+        if (unexpected) {
+          stepEyebrow.textContent = '';
+          stepTitle.textContent = "Connection Lost";
+          stepDesc.textContent = "The printer was unplugged or stopped responding. Check the USB cable, then reconnect to resume — the wizard will start over from homing.";
+          btnNext.style.display = 'none';
+          gcodePreview.style.display = 'none';
+          currentStep = -1;
+        }
+      }
+    }
+
+    function handleUnexpectedDisconnect() {
+      logLine("Printer was unplugged or lost connection. Check the USB cable and reconnect.", "line-err");
+      disconnectSerial({ silent: true, unexpected: true });
+    }
+
+    // ---------------------------------------------------------------------
+    // Serial: read loop with line buffering + "ok" / "Error" detection
+    // ---------------------------------------------------------------------
+    let lineBuffer = '';
+    let pendingResolvers = []; // FIFO of {resolve, reject} waiting on next "ok"
+
+    function startReadLoop() {
+      const textDecoder = new TextDecoderStream();
+      readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
+      reader = textDecoder.readable.getReader();
+
+      (async () => {
+        try {
+          while (true) {
+            const { value, done } = await reader.read();
+            if (done) break;
+            if (value) handleIncoming(value);
+          }
+        } catch (err) {
+          // Expected when reader.cancel() is called during disconnect
+          if (port) {
+            console.error("Read loop error:", err);
+          }
+        }
+      })();
+    }
+
+    function handleIncoming(chunk) {
+      lineBuffer += chunk;
+      let idx;
+      while ((idx = lineBuffer.indexOf('\n')) >= 0) {
+        const rawLine = lineBuffer.slice(0, idx).trim();
+        lineBuffer = lineBuffer.slice(idx + 1);
+        if (rawLine.length === 0) continue;
+        logLine(rawLine);
+
+        parseTemperatureReport(rawLine);
+        parseFirmwareInfoLine(rawLine);
+
+        const lower = rawLine.toLowerCase();
+        if (lower.startsWith('ok')) {
+          const next = pendingResolvers.shift();
+          if (next) next.resolve(rawLine);
+        } else if (lower.startsWith('error') || lower.includes('printer halted')) {
+          const next = pendingResolvers.shift();
+          if (next) {
+            next.reject(new Error(rawLine));
+          } else {
+            // Unsolicited error (e.g. thermal issue) — surface it immediately.
+            handlePrinterError(rawLine);
+          }
+        }
+        // Lines like "busy:processing" or temperature reports are just logged, not acked.
+      }
+    }
+
+    // ---------------------------------------------------------------------
+    // Temperature reporting
+    // ---------------------------------------------------------------------
+    // Marlin emits lines like:
+    //   T:30.31 /0.00 B:46.88 /50.00 @:0 B@:127 W:?
+    // in response to M105, or continuously if M155 (autoreport) is on.
+    // T: = hotend current/target, B: = bed current/target. Both targets show /0.00 when off.
+    const TEMP_LINE_RE = /T:(-?\d+\.?\d*)\s*\/(-?\d+\.?\d*).*?B:(-?\d+\.?\d*)\s*\/(-?\d+\.?\d*)/;
+    let lastTempAt = 0;
+    let tempWatchdog = null;
+    const TEMP_STALE_MS = 8000;
+    const TEMP_AT_TARGET_TOLERANCE = 2; // °C
+
+    function parseTemperatureReport(line) {
+      const m = line.match(TEMP_LINE_RE);
+      if (!m) return;
+      const hotendCur = parseFloat(m[1]);
+      const hotendTgt = parseFloat(m[2]);
+      const bedCur = parseFloat(m[3]);
+      const bedTgt = parseFloat(m[4]);
+      lastTempAt = Date.now();
+      updateTempCard(tempCardHotend, tempHotendCur, tempHotendTgt, tempHotendFill, hotendCur, hotendTgt);
+      updateTempCard(tempCardBed, tempBedCur, tempBedTgt, tempBedFill, bedCur, bedTgt);
+      armTempWatchdog();
+    }
+
+    function updateTempCard(card, curEl, tgtEl, fillEl, cur, tgt) {
+      curEl.textContent = cur.toFixed(1);
+      tgtEl.textContent = tgt.toFixed(0);
+      card.classList.remove('stale', 'heating', 'at-target');
+      if (tgt > 0) {
+        const pct = Math.max(0, Math.min(100, (cur / tgt) * 100));
+        fillEl.style.width = pct + '%';
+        if (Math.abs(cur - tgt) <= TEMP_AT_TARGET_TOLERANCE) {
+          card.classList.add('at-target');
+        } else {
+          card.classList.add('heating');
+        }
+      } else {
+        fillEl.style.width = '0%';
+      }
+    }
+
+    // If no T: line has arrived in a while (printer not auto-reporting, or link is quiet),
+    // mark the cards stale rather than showing a confidently wrong number.
+    function armTempWatchdog() {
+      if (tempWatchdog) clearTimeout(tempWatchdog);
+      tempWatchdog = setTimeout(() => {
+        if (Date.now() - lastTempAt >= TEMP_STALE_MS) {
+          tempCardHotend.classList.add('stale');
+          tempCardBed.classList.add('stale');
+        }
+      }, TEMP_STALE_MS);
+    }
+
+    // Some Marlin builds need M155 to push temperature reports automatically; others only
+    // reply when asked. We poll M105 as a fallback, but skip sending it on any tick where a
+    // temperature line has already arrived on its own (i.e. the firmware is auto-reporting) —
+    // no point asking for data that's already showing up unprompted.
+    // IMPORTANT: M105 is routed through sendLineAndWaitForOk like any other command, not a raw
+    // write — Marlin's M105 reply is "ok T:.. B:.." on a single line, so if it were sent as a
+    // bare fire-and-forget write while a real wizard command (e.g. a jog move) was mid-flight,
+    // the M105 reply's "ok" could be consumed by the wrong pending resolver. Queuing it properly
+    // means it waits its turn and never steals an ok that belongs to a jog or approach move.
+    let tempPollTimer = null;
+    let tempPollInFlight = false;
+    const TEMP_POLL_INTERVAL_MS = 3000;
+    function startTempPolling() {
+      stopTempPolling();
+      tempPollTimer = setInterval(async () => {
+        if (tempPollInFlight || !writer) return;
+        // If we've heard a temp line more recently than one poll interval ago, the firmware
+        // is auto-reporting on its own — stay quiet and just keep reading.
+        if (Date.now() - lastTempAt < TEMP_POLL_INTERVAL_MS) return;
+        tempPollInFlight = true;
+        try {
+          await sendLineAndWaitForOk("M105", 4000);
+        } catch (err) {
+          // Non-fatal — just means we missed one reading; the next poll will retry.
+        } finally {
+          tempPollInFlight = false;
+        }
+      }, TEMP_POLL_INTERVAL_MS);
+    }
+    function stopTempPolling() {
+      if (tempPollTimer) { clearInterval(tempPollTimer); tempPollTimer = null; }
+    }
+
+    // ---------------------------------------------------------------------
+    // Hardware / firmware info (M115)
+    // ---------------------------------------------------------------------
+    // Marlin replies to M115 with a single line like:
+    //   FIRMWARE_NAME:Marlin 2.1.3 (...) SOURCE_CODE_URL:... PROTOCOL_VERSION:1.0
+    //   MACHINE_TYPE:3D Printer KINEMATICS:Cartesian EXTRUDER_COUNT:1 UUID:xxxxxxxx-...
+    // Some boards add a Cap: capability report on following lines, which we ignore.
+    function parseFirmwareInfoLine(line) {
+      const grab = (key) => {
+        // Values run up to the next KEY: token or end of line.
+        const re = new RegExp(key + ':\\s*([^]*?)(?:\\s+[A-Z_]+:|$)');
+        const m = line.match(re);
+        return m ? m[1].trim() : null;
+      };
+      const firmware = grab('FIRMWARE_NAME');
+      const machine = grab('MACHINE_TYPE');
+      const kinematics = grab('KINEMATICS');
+      const extruders = grab('EXTRUDER_COUNT');
+      const protocol = grab('PROTOCOL_VERSION');
+      const uuid = grab('UUID');
+      if (!firmware && !machine && !uuid) return false;
+      if (firmware) hwFirmware.textContent = firmware;
+      if (machine) hwMachine.textContent = machine;
+      hwKinematics.textContent = kinematics || 'Cartesian';
+      hwExtruders.textContent = extruders || '—';
+      hwProtocol.textContent = protocol || '—';
+      hwUuid.textContent = uuid || '—';
+      [hwFirmware, hwMachine, hwKinematics, hwExtruders, hwProtocol, hwUuid].forEach(el => el.classList.remove('dim'));
+      return true;
+    }
+
+    function resetHardwareInfo() {
+      [hwFirmware, hwMachine, hwKinematics, hwExtruders, hwProtocol, hwUuid].forEach(el => {
+        el.textContent = '—';
+        el.classList.add('dim');
+      });
+    }
+
+    // One-shot query right after connecting. Routed through the same ok-queue as everything
+    // else so it can't collide with the homing step if the user clicks through quickly.
+    // The actual parsing happens live in handleIncoming as each line streams in (Marlin sends
+    // FIRMWARE_NAME on its own line, often followed by a long run of Cap: lines before the
+    // final "ok" — sometimes 20+ of them — so we can't rely on the resolved "ok" line itself,
+    // or on scanning a small fixed window of recent console lines after the fact).
+    async function queryFirmwareInfo() {
+      try {
+        await sendLineAndWaitForOk("M115", 5000);
+      } catch (err) {
+        logLine("Could not read firmware info (M115): " + err.message, "line-err");
+      }
+    }
+
+    function handlePrinterError(message) {
+      logLine("Printer reported an error: " + message, "line-err");
+      alert("Printer reported an error:\n" + message + "\n\nThe wizard has been stopped. Check the printer.");
+      emergencyStop();
+    }
+
+    // Send a single G-code line and wait for the matching "ok" (or timeout).
+    function sendLineAndWaitForOk(cmd, timeoutMs = 20000) {
+      return new Promise(async (resolve, reject) => {
+        if (!writer) {
+          reject(new Error("Not connected"));
+          return;
+        }
+        const timer = setTimeout(() => {
+          // Remove this resolver from the queue if it's still pending
+          const i = pendingResolvers.findIndex(r => r.resolve === resolve);
+          if (i >= 0) pendingResolvers.splice(i, 1);
+          reject(new Error(`Timed out waiting for response to "${cmd}"`));
+        }, timeoutMs);
+
+        pendingResolvers.push({
+          resolve: (line) => { clearTimeout(timer); resolve(line); },
+          reject: (err) => { clearTimeout(timer); reject(err); }
+        });
+
+        try {
+          logLine("> " + cmd, "line-sent");
+          await writer.write(cmd + '\n');
+        } catch (err) {
+          clearTimeout(timer);
+          pendingResolvers.pop();
+          reject(err);
+        }
+      });
+    }
+
+    // Send a multi-line G-code block sequentially, waiting for "ok" between each line.
+    // G28 (homing) and other slow moves get a longer timeout since they block the buffer.
+    async function sendGcodeBlock(gcodeBlock) {
+      const commands = gcodeBlock.split('\n').map(c => c.trim()).filter(Boolean);
+      for (const cmd of commands) {
+        const isHoming = cmd.toUpperCase().startsWith('G28');
+        const timeout = isHoming ? 30000 : 15000;
+        await sendLineAndWaitForOk(cmd, timeout);
+      }
+    }
+
+    // ---------------------------------------------------------------------
+    // Emergency stop
+    // ---------------------------------------------------------------------
+    btnEstop.addEventListener('click', emergencyStop);
+
+    async function emergencyStop() {
+      logLine("EMERGENCY STOP triggered.", "line-err");
+      stopTempPolling();
+      // M112 is Marlin's immediate halt — it does not wait for "ok" and resets the board.
+      try {
+        if (writer) {
+          await writer.write("M112\n");
+        }
+      } catch (err) {
+        console.error("Failed to send M112:", err);
+      }
+      // Clear any pending waits since the printer will not respond normally after M112.
+      pendingResolvers.forEach(r => r.reject(new Error("Emergency stop")));
+      pendingResolvers = [];
+      btnNext.disabled = true;
+      stepEyebrow.textContent = '';
+      stepTitle.textContent = "Emergency Stop Activated";
+      stepDesc.textContent = "M112 was sent. Power-cycle the printer and reconnect before resuming.";
+      zJogControls.style.display = 'none';
+      nozzleEl.setAttribute('opacity', '0');
+      await disconnectSerial({ silent: true });
+      logLine("Disconnected after emergency stop. Power-cycle the printer before continuing.", "line-err");
+    }
+
+    // ---------------------------------------------------------------------
+    // Wizard progression
+    // ---------------------------------------------------------------------
+    btnNext.addEventListener('click', async () => {
+      try {
+        btnNext.disabled = true;
+
+        if (currentStep === -1) {
+          // First click: run the homing/auto step
+          currentStep = 0;
+          await runAutoStep(wizardSteps[currentStep]);
+        } else {
+          const step = wizardSteps[currentStep];
+          if (step.kind === 'corner') {
+            // Finish the jog phase for this corner, then advance.
+            zJogControls.style.display = 'none';
+          }
+          currentStep++;
+          if (currentStep < wizardSteps.length) {
+            const next = wizardSteps[currentStep];
+            if (next.kind === 'auto') {
+              await runAutoStep(next);
+            } else {
+              await runApproachForCorner(next);
+            }
+          }
+        }
+
+        updateUI();
+      } catch (err) {
+        console.error(err);
+        logLine("Error: " + err.message, "line-err");
+        alert("Something went wrong sending G-code:\n" + err.message + "\n\nThe printer connection may be unstable. Check it before continuing.");
+      } finally {
+        if (currentStep < wizardSteps.length - 1) {
+          btnNext.disabled = false;
+        }
+      }
+    });
+
+    async function runAutoStep(step) {
+      btnNext.textContent = "Sending commands...";
+      gcodePreview.style.display = 'block';
+      gcodeText.textContent = step.gcode;
+      await sendGcodeBlock(step.gcode);
+    }
+
+    // Move to hover height above the corner, travel over it, then descend only to a safe
+    // approach height (never directly to Z0). The user takes over from there with jog buttons.
+    async function runApproachForCorner(step) {
+      btnNext.textContent = "Moving to corner...";
+      const gcode = `G1 Z${HOVER_Z} F3000\nG1 X${step.x} Y${step.y} F4000\nG1 Z${APPROACH_Z} F1500`;
+      gcodePreview.style.display = 'block';
+      gcodeText.textContent = gcode;
+      await sendGcodeBlock(gcode);
+      zOffset = 0;
+      zCurrentLabel.textContent = zOffset.toFixed(2);
+      zJogControls.style.display = 'block';
+    }
+
+    // Manual jog buttons — small relative Z moves under direct user control.
+    document.querySelectorAll('.btn-jog').forEach(btn => {
+      btn.addEventListener('click', async () => {
+        const dz = parseFloat(btn.dataset.dz);
+        // Guard rail: never let the cumulative jog push the nozzle more than 2mm
+        // below the approach height — catches fat-fingering or a runaway click.
+        const projected = zOffset + dz;
+        if (APPROACH_Z + projected < -2) {
+          alert("That would move more than 2mm below the approach height. Stopping as a safety precaution — re-home if you need to go further.");
+          return;
+        }
+        document.querySelectorAll('.btn-jog').forEach(b => b.disabled = true);
+        try {
+          await sendLineAndWaitForOk(`G91`, 5000);              // relative mode
+          await sendLineAndWaitForOk(`G1 Z${dz} F300`, 5000);    // slow, deliberate move
+          await sendLineAndWaitForOk(`G90`, 5000);               // back to absolute mode
+          zOffset = projected;
+          zCurrentLabel.textContent = zOffset.toFixed(2);
+        } catch (err) {
+          logLine("Jog error: " + err.message, "line-err");
+          alert("Jog command failed: " + err.message);
+        } finally {
+          document.querySelectorAll('.btn-jog').forEach(b => b.disabled = false);
+        }
+      });
+    });
+
+    // ---------------------------------------------------------------------
+    // UI rendering
+    // ---------------------------------------------------------------------
+    function updateBedMap(step) {
+      // Reset all dots/labels to idle
+      Object.keys(cornerDots).forEach(k => {
+        cornerDots[k].setAttribute('fill', '#5e636f');
+        cornerDots[k].setAttribute('r', 5);
+        cornerLabels[k].classList.remove('active');
+      });
+
+      if (step.kind === 'corner' && step.corner) {
+        const k = step.corner;
+        cornerDots[k].setAttribute('fill', '#ff6a35');
+        cornerDots[k].setAttribute('r', 7);
+        cornerLabels[k].classList.add('active');
+
+        const pos = cornerPos[k];
+        nozzleEl.setAttribute('cx', pos.x);
+        nozzleEl.setAttribute('cy', pos.y);
+        nozzleEl.setAttribute('opacity', '1');
+
+        // mark passes already completed as a dim ok-green ring (visited corners on pass 1)
+        wizardSteps.forEach((s, i) => {
+          if (s.kind === 'corner' && i < currentStep && s.pass === 1 && s.corner !== k) {
+            // leave default unless it's the currently active corner
+          }
+        });
+      } else {
+        nozzleEl.setAttribute('opacity', '0');
+      }
+    }
+
+    function updateUI() {
+      const atEnd = currentStep >= wizardSteps.length - 1;
+      const step = wizardSteps[Math.max(currentStep, 0)];
+
+      // Eyebrow: pass label for corner re-checks, step counter otherwise
+      if (currentStep >= 0) {
+        if (step.kind === 'corner') {
+          stepEyebrow.textContent = step.pass === 2 ? 'Cross-check pass' : 'First pass';
+        } else if (currentStep === 0) {
+          stepEyebrow.textContent = 'Setup';
+        } else {
+          stepEyebrow.textContent = 'Finished';
+        }
+      } else {
+        stepEyebrow.textContent = '';
+      }
+
+      stepTitle.textContent = step.title;
+      stepDesc.textContent = step.desc;
+
+      const stepNum = Math.max(currentStep + 1, 0);
+      progressText.textContent = `Step ${stepNum} / ${wizardSteps.length}`;
+      const progress = (stepNum / wizardSteps.length) * 100;
+      progressBar.style.width = `${Math.max(progress, 0)}%`;
+      progressPct.textContent = `${Math.round(Math.max(progress, 0))}%`;
+
+      if (step.kind === 'corner' && !atEnd) {
+        zJogControls.style.display = 'block';
+      } else {
+        zJogControls.style.display = 'none';
+      }
+
+      updateBedMap(currentStep >= 0 ? step : { kind: null });
+
+      if (atEnd) {
+        btnNext.style.display = 'none';
+      } else {
+        btnNext.style.display = 'inline-block';
+        btnNext.disabled = false;
+        const next = wizardSteps[currentStep + 1];
+        if (next.kind === 'auto') {
+          btnNext.textContent = currentStep === -1 ? "Start Homing (Step 1)" : `Run: ${next.title}`;
+        } else {
+          btnNext.textContent = `Go to: ${next.title}`;
+        }
+      }
+    }
+  </script>
+</body>
+</html>
